@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+</head>
+<body>
+
+<script type="text/template" id="codeStarts">
+    Start<br/>
+
+    UIBezierPath *bezierPath = [UIBezierPath bezierPath];
+    <br/>
+</script>
+
+
+<script type="text/template" id="line">
+
+
+    CGPoint anchor = CGPointMake(<%-data.anchor.horizontal/2%>, <%-data.anchor.vertical/2%>);
+    <%if(data.forward){%>CGPoint point1 = CGPointMake(<%-data.forwardPrevious.horizontal/2%>, <%-data.forwardPrevious.vertical/2%>);<%}%>
+    <%if(data.backward){%>CGPoint point2 = CGPointMake(<%-data.backwardDic.horizontal/2%>, <%-data.backwardDic.vertical/2%>);<%}%>
+
+    <%if(data.forward && data.backward){%>
+        [bezierPath addCurveToPoint:anchor controlPoint1:point1 controlPoint2:point2];
+    <%} else {%>
+        [bezierPath addLineToPoint:anchor];
+    <%}%>
+
+</script>
+
+<script type="text/template" id="codeEnds">End</script>
+
+<script type="text/javascript" src="underscore-min.js"></script>
+<script type="text/javascript" src="app.js"></script>
+</body>
+</html>
