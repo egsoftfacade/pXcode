@@ -283,24 +283,101 @@ var layerJSON = {
 }
 
 
+var pathTemplate = {
+    start: "UIBezierPath *bezierPath = [UIBezierPath bezierPath];<br/>"
+    , line: "CGPoint anchor = CGPointMake({{data.anchor.horizontal}}/2, {{data.anchor.vertical}}/2);" +
+        "<br/>CGPoint point1 = CGPointMake({{data.forwardPrevious.horizontal}}/2, {{data.forwardPrevious.vertical}}/2);" +
+        "<br/>CGPoint point2 = CGPointMake({{data.backwardDic.horizontal}}/2, {{data.backwardDic.vertical}}/2);" +
+        "<br/>{{#if data.forward}}" +
+        "[bezierPath addCurveToPoint:anchor controlPoint1:point1 controlPoint2:point2];" +
+        "{{else}}" +
+        "[bezierPath addLineToPoint:anchor];" +
+        "{{/if}}<br/>"
+    , end: "[bezierPath closePath];<br/>"
+}
+
+var layerTemplate = {
+    dropShadow: "<br/>// --- Drop Shadow ---<br/>" +
+        "CGFloat dropShadowDist = {{data.distance}};<br/>" +
+        "CGFloat dropAngle = {{#if data.localLightingAngle}} {{data.localLightingAngle}} {{/if}};<br/>" +
+        "CGFloat distanseX = -cosf(dropAngle * M_PI / 180) * dropShadowDist;<br/>" +
+        "CGFloat distanseY = sinf(dropAngle * M_PI / 180) * dropShadowDist;<br/>" +
+        "UIColor *shadowColor = [UIColor colorWithRed:[{{data.color.red}}] / 255.0 green:[{{data.color.green}}]  / 255.0 blue:[{{data.color.blue}}]  / 255.0 alpha:[{{data.opacity}}]/100;<br/>" +
+        "CGContextSetShadowWithColor(context, CGSizeMake(distanseX, distanseY), [{{data.blur}}], shadowColor.CGColor);<br/>" +
+        "// -- Drop Shadow end --- CGContextBeginTransparencyLayer(context, NULL); [bezierPath addClip];"
+    , gradient: {
+        start: "<br/>// -- Gradient --<br/>" +
+            "CGColorSpaceRef spacce = CGColorSpaceCreateDeviceRGB();<br/>" +
+            "CGFloat interpolation = [{{data.gradient.interpolation}}];<br/>" +
+            "CGFloat opacity = [{{data.opacity}}]/100;<br/>" +
+            "CGFloat *gradientLocations = (CGFloat *)calloc(sizeof(CGFloat), {{data.gradient.colors.length}});<br/>"
+        , color: "var colorDic = data.gradient.colors[i]; }}<br/>" +
+            "CGFloat red = [{{colorDic.color.red}}];<br/>" +
+            "CGFloat green = [{{colorDic.color.green}}];<br/>" +
+            "CGFloat blue = [{{colorDic.color.blue}}];<br/>" +
+            "UIColor *color = [UIColor colorWithRed:red / 255.0 green:green / 255.0 blue:blue / 255.0 alpha:opacity];<br/>" +
+            "[gradientColors addObject:(id)color.CGColor];<br/>" +
+            "CGFloat location = [{{colorDic.location}}] / interpolation;<br/>" +
+            "gradientLocations[[colors indexOfObject:{{colorDic}}]] =  location;<br/>"
+        , "end" : "//each color<br/>" +
+            "CGGradientRef gradient = CGGradientCreateWithColors(spacce, (__bridge CFArrayRef)(gradientColors), gradientLocations);<br/>" +
+            "CGRect bezierBounds = [bezierPath bounds];<br/>" +
+            "CGContextDrawLinearGradient(context, gradient, CGPointMake(CGRectGetMidX(bezierBounds), CGRectGetMaxY(bezierBounds)), CGPointMake(CGRectGetMidX(bezierBounds), CGRectGetMinY(bezierBounds)), 0);<br/>" +
+            "CGContextEndTransparencyLayer(context);"
+    }
+    , innerShadow: "<br/>// -- Inner Shadow<br/>" +
+        "CGFloat inDist = [{{data.distance}}];<br/>" +
+        "CGFloat blur = [{{data.blur}}];<br/>" +
+        "CGFloat angle = [{{data.localLightingAngle}}];<br/>" +
+        "distanseX = -cosf(angle * M_PI / 180) * inDist;<br/>" +
+        "distanseY = sinf(angle * M_PI / 180) * inDist; //distanseX = 0;<br/>" +
+        "UIColor *innerColor = [UIColor colorWithRed:[{{data.color.red}}]/ 255.0 green:[{{data.color.green}}] / 255.0 blue:[{{data.color.blue}}] / 255.0 alpha:[{{data.opacity}}]/100;<br/>" +
+        "CGRect beizierBounds = CGRectInset([bezierPath bounds], -blur, -blur);<br/>" +
+        "beizierBounds = CGRectOffset(beizierBounds, -distanseX, -distanseY);<br/>" +
+        "beizierBounds = CGRectInset(CGRectUnion(beizierBounds, [bezierPath bounds]), -1, -1);<br/>" +
+        "UIBezierPath *negativeBezier = [UIBezierPath bezierPathWithRect:beizierBounds]; [negativeBezier appendPath:bezierPath];<br/>" +
+        "negativeBezier.usesEvenOddFillRule = YES;<br/>" +
+        "CGContextSaveGState(context);<br/>" +
+        "{<br/>" +
+        "CGFloat xOffset = distanseX + round(beizierBounds.size.width);<br/>" +
+        "CGFloat yOffset = distanseY;<br/>" +
+        "CGContextSetShadowWithColor(context, CGSizeMake(xOffset + copysign(0.1, xOffset), yOffset + copysign(0.1, yOffset)), blur, innerColor.CGColor);<br/>" +
+        "[bezierPath addClip];<br/>" +
+        "CGAffineTransform transform = CGAffineTransformMakeTranslation(-round(beizierBounds.size.width), 0);<br/>" +
+        "[negativeBezier applyTransform:transform];<br/>" +
+        "[innerColor setFill];<br/>" +
+        "[negativeBezier fill];<br/>" +
+        "}<br/>" +
+        "CGContextRestoreGState(context);<br/>" +
+        "CGContextRestoreGState(context);"
+    , stroke: '<br/>/// ---- Stroke<br/>' +
+        '[[UIColor colorWithRed:[{{data.color.red}}] / 255.0 green:[{{data.color.green}}] / 255.0 blue:[{{data.color.blue}}] / 255.0 alpha:[{{data.opacity}}]/100 setStroke];<br/>' +
+        'CGContextSetLineWidth(context, [{{data.size}}]);<br/>' +
+        '[bezierPath stroke];'
+}
 var PXCode = ""
 
 
 //path build
 
-PXCode += _.template(document.getElementById("pathStarts").innerHTML)()
+PXCode += Handlebars.compile(pathTemplate.start)()
 for(var i= 0, o = starJSON.pathComponents[0].subpathListKey[0].points; i < o.length; i++ ){
-    PXCode += _.template(document.getElementById("line").innerHTML, {data: o[i]})
-        + "<br/>"
+    PXCode += Handlebars.compile(pathTemplate.line)({data: o[i]})
 }
-
-PXCode += _.template(document.getElementById("pathEnds").innerHTML)()
+PXCode += Handlebars.compile(pathTemplate.end)()
 //layer build
 
-PXCode += _.template(document.getElementById("layerDropShadow").innerHTML, {data: layerJSON.layerEffects.dropShadow})
-PXCode += _.template(document.getElementById("layerGradient").innerHTML, {data: layerJSON.layerEffects.gradientFill})
-PXCode += _.template(document.getElementById("layerInnerShadow").innerHTML, {data: layerJSON.layerEffects.innerShadow})
-PXCode += _.template(document.getElementById("layerStroke").innerHTML, {data: layerJSON.layerEffects.frameFX})
+PXCode += Handlebars.compile(layerTemplate.dropShadow)({data: layerJSON.layerEffects.dropShadow})
+
+PXCode += Handlebars.compile(layerTemplate.gradient.start)({data: layerJSON.layerEffects.gradientFill})
+for(var i = 0, o = layerJSON.layerEffects.gradientFill.gradient.colors; i < o.length; i++){
+    PXCode += Handlebars.compile(layerTemplate.gradient.color)({data: layerJSON.layerEffects.gradientFill})
+}
+PXCode += Handlebars.compile(layerTemplate.gradient.end)({data: layerJSON.layerEffects.gradientFill})
+
+
+PXCode += Handlebars.compile(layerTemplate.innerShadow)({data: layerJSON.layerEffects.innerShadow})
+PXCode += Handlebars.compile(layerTemplate.stroke)({data: layerJSON.layerEffects.frameFX})
 
 
 document.write(PXCode);
