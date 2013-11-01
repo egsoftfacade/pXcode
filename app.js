@@ -285,13 +285,22 @@ var layerJSON = {
 
 var PXCode = ""
 
-PXCode += _.template(document.getElementById("codeStarts").innerHTML)()
 
+//path build
+
+PXCode += _.template(document.getElementById("pathStarts").innerHTML)()
 for(var i= 0, o = starJSON.pathComponents[0].subpathListKey[0].points; i < o.length; i++ ){
     PXCode += _.template(document.getElementById("line").innerHTML, {data: o[i]})
         + "<br/>"
 }
 
-PXCode += _.template(document.getElementById("codeEnds").innerHTML)()
+PXCode += _.template(document.getElementById("pathEnds").innerHTML)()
+//layer build
+
+PXCode += _.template(document.getElementById("layerDropShadow").innerHTML, {data: layerJSON.layerEffects.dropShadow})
+PXCode += _.template(document.getElementById("layerGradient").innerHTML, {data: layerJSON.layerEffects.gradientFill})
+PXCode += _.template(document.getElementById("layerInnerShadow").innerHTML, {data: layerJSON.layerEffects.innerShadow})
+PXCode += _.template(document.getElementById("layerStroke").innerHTML, {data: layerJSON.layerEffects.frameFX})
+
 
 document.write(PXCode);

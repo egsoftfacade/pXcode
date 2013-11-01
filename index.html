@@ -5,17 +5,13 @@
 </head>
 <body>
 
-<script type="text/template" id="codeStarts">
-    Start<br/>
-
+<script type="text/template" id="pathStarts">
     UIBezierPath *bezierPath = [UIBezierPath bezierPath];
     <br/>
 </script>
 
 
 <script type="text/template" id="line">
-
-
     CGPoint anchor = CGPointMake(<%-data.anchor.horizontal/2%>, <%-data.anchor.vertical/2%>);
     <%if(data.forward){%>CGPoint point1 = CGPointMake(<%-data.forwardPrevious.horizontal/2%>, <%-data.forwardPrevious.vertical/2%>);<%}%>
     <%if(data.backward){%>CGPoint point2 = CGPointMake(<%-data.backwardDic.horizontal/2%>, <%-data.backwardDic.vertical/2%>);<%}%>
@@ -28,7 +24,144 @@
 
 </script>
 
-<script type="text/template" id="codeEnds">End</script>
+<script type="text/template" id="pathEnds">
+    [bezierPath closePath];
+</script>
+
+<script type="text/template" id="layerDropShadow">
+    <br/>// --- Drop Shadow ---<br/>
+
+    CGFloat dropShadowDist = <%if(data.distance) print(data.distance) %>;
+    CGFloat dropAngle = <%if(data.localLightingAngle) print(data.localLightingAngle) %>;
+
+    CGFloat distanseX = -cosf(dropAngle * M_PI / 180) * dropShadowDist;
+    CGFloat distanseY = sinf(dropAngle * M_PI / 180) * dropShadowDist;
+
+    UIColor *shadowColor = [UIColor colorWithRed:[<%-data.color.red%>] / 255.0
+    green:[<%-data.color.green%>]  / 255.0
+    blue:[<%-data.color.blue%>]  / 255.0
+    alpha:[<%-data.opacity/100%>];<br/>
+
+    CGContextSetShadowWithColor(context, CGSizeMake(distanseX, distanseY), [<%-data.blur%>], shadowColor.CGColor);
+
+
+    <br/>// -- Drop Shadow end ---<br/>
+
+    CGContextBeginTransparencyLayer(context, NULL);
+    [bezierPath addClip];
+</script>
+
+<script type="text/template" id="layerGradient">
+    <br/>// -- Gradient --<br/>
+
+    CGColorSpaceRef spacce = CGColorSpaceCreateDeviceRGB();
+    CGFloat interpolation = [<%-data.gradient.interpolation%>];
+
+    CGFloat opacity = [<%-data.opacity/100%>];
+
+    CGFloat *gradientLocations = (CGFloat *)calloc(sizeof(CGFloat), <%-data.gradient.colors.length%>);
+<br/>//each color
+    <% _.each(data.gradient.colors, function(colorDic){%>
+<br/>
+    CGFloat red = [<%-colorDic.color.red%>];
+    CGFloat green = [<%-colorDic.color.green%>];
+    CGFloat blue = [<%-colorDic.color.blue%>];
+
+    UIColor *color = [UIColor colorWithRed:red / 255.0
+    green:green / 255.0
+    blue:blue / 255.0
+    alpha:opacity];
+    [gradientColors addObject:(id)color.CGColor];
+    <br/>
+
+    CGFloat location = [<%-colorDic.location%>] / interpolation;
+    gradientLocations[[colors indexOfObject:<%-colorDic%>]] =  location;
+    <%})//each%>
+    <br/>
+
+    CGGradientRef gradient = CGGradientCreateWithColors(spacce, (__bridge CFArrayRef)(gradientColors), gradientLocations);
+
+    CGRect bezierBounds = [bezierPath bounds];
+    <br/>
+    CGContextDrawLinearGradient(context, gradient,
+    CGPointMake(CGRectGetMidX(bezierBounds), CGRectGetMaxY(bezierBounds)),
+    CGPointMake(CGRectGetMidX(bezierBounds), CGRectGetMinY(bezierBounds)),
+    0);
+    CGContextEndTransparencyLayer(context);
+
+</script>
+
+<script type="text/template" id="layerInnerShadow">
+    <br/>
+    // -- Inner Shadow
+    <br/>
+    CGFloat inDist = [<%-data.distance%>];
+    CGFloat blur = [<%-data.blur%>];
+    CGFloat angle = [<%-data.localLightingAngle%>];
+    <br/>
+
+    distanseX = -cosf(angle * M_PI / 180) * inDist;
+    distanseY = sinf(angle * M_PI / 180) * inDist;
+
+    //distanseX = 0;
+
+    UIColor *innerColor = [UIColor colorWithRed:[<%-data.color.red%>]/ 255.0
+    green:[<%-data.color.green%>] / 255.0
+    blue:[<%-data.color.blue%>] / 255.0
+    alpha:[<%-data.opacity/100%>];
+    <br/>
+
+    CGRect beizierBounds = CGRectInset([bezierPath bounds], -blur, -blur);
+    beizierBounds = CGRectOffset(beizierBounds, -distanseX, -distanseY);
+    beizierBounds = CGRectInset(CGRectUnion(beizierBounds, [bezierPath bounds]), -1, -1);
+    <br/>
+
+    UIBezierPath *negativeBezier = [UIBezierPath bezierPathWithRect:beizierBounds];
+    [negativeBezier appendPath:bezierPath];
+    negativeBezier.usesEvenOddFillRule = YES;
+
+    <br/>
+    CGContextSaveGState(context);
+    <br/>
+    {
+    CGFloat xOffset = distanseX + round(beizierBounds.size.width);
+    CGFloat yOffset = distanseY;
+    CGContextSetShadowWithColor(context, CGSizeMake(xOffset + copysign(0.1, xOffset), yOffset + copysign(0.1, yOffset)), blur, innerColor.CGColor);
+    [bezierPath addClip];
+    <br/>
+    CGAffineTransform transform = CGAffineTransformMakeTranslation(-round(beizierBounds.size.width), 0);
+    [negativeBezier applyTransform:transform];
+    [innerColor setFill];
+    [negativeBezier fill];
+    }
+    <br/>
+    CGContextRestoreGState(context);
+    <br/>
+
+    CGContextRestoreGState(context);
+
+</script>
+
+<script type="text/template" id="layerStroke">
+    <br/>
+    /// ---- Stroke
+    <br/>
+    NSDictionary *strokeDic = [effects[@"layerEffects"] objectForKey:@"frameFX"];
+    <br/>
+
+    NSDictionary *colorDic = strokeDic[@"color"];
+    <br/>
+
+    [[UIColor colorWithRed:[<%-data.color.red%>] / 255.0
+    green:[<%-data.color.green%>] / 255.0
+    blue:[<%-data.color.blue%>] / 255.0
+    alpha:[<%-data.opacity/100%>] setStroke];
+    <br/>
+    CGContextSetLineWidth(context, [<%-data.size%>]);
+    <br/>
+    [bezierPath stroke];
+</script>
+
 
 <script type="text/javascript" src="underscore-min.js"></script>
 <script type="text/javascript" src="app.js"></script>
